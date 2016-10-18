@@ -1,0 +1,5 @@
+name: mvmock
+buildpack: go_buildpack
+memory: 16mb
+env:
+  SKIP_SSL_VALIDATION: true

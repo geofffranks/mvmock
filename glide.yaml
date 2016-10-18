@@ -1,0 +1,4 @@
+package: github.com/geofffranks/mvmock
+import:
+- package: github.com/gin-gonic/gin
+  version: ~1.0.0

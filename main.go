@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha512"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -45,7 +46,6 @@ func main() {
 			return
 		}
 		data := encoder.EncodeToString(publicKey)
-		fmt.Printf("PubKey:\n%s\n", data)
 		c.Data(200, "application/text", []byte(data))
 		c.Done()
 	})
@@ -64,7 +64,6 @@ func main() {
 		}
 		privateKey := x509.MarshalPKCS1PrivateKey(k)
 		data := encoder.EncodeToString(privateKey)
-		fmt.Printf("PrivKey:\n%s\n", data)
 		c.Data(200, "application/text", []byte(data))
 		c.Done()
 	})
@@ -74,29 +73,31 @@ func main() {
 		port := c.Param("port")
 
 		expected := "This is a test. This is only a test."
+		label := []byte("test-mvmock-encryption")
+		unique := uuid.New()
 
-		pubKey, err := getPublicKey(scheme, host, port)
+		pubKey, err := getPublicKey(scheme, host, port, unique)
 		if err != nil {
 			c.Data(500, "application/text", []byte(err.Error()+"\n"))
 			c.Done()
 			return
 		}
-		encrypted, err := encrypt(pubKey, expected)
+		encrypted, err := encrypt(pubKey, expected, label)
 		if err != nil {
 			c.Data(500, "application/text", []byte(err.Error()+"\n"))
 			c.Done()
 			return
 		}
 
-		privKey, err := getPrivKey(scheme, host, port)
+		privKey, err := getPrivKey(scheme, host, port, unique)
 		if err != nil {
-			c.Data(500, "application/text", []byte(err.Error()+"\n"))
+			c.Data(500, "application/text", []byte("privkey error: "+err.Error()+"\n"))
 			c.Done()
 			return
 		}
-		decrypted, err := decrypt(privKey, encrypted)
+		decrypted, err := decrypt(privKey, encrypted, label)
 		if err != nil {
-			c.Data(500, "application/text", []byte(err.Error()+"\n"))
+			c.Data(500, "application/text", []byte("decryption error: "+err.Error()+"\n"))
 			c.Done()
 			return
 		}
@@ -123,8 +124,8 @@ func findKey(key string) (*rsa.PrivateKey, error) {
 	return k, nil
 }
 
-func getPublicKey(scheme, host, port string) (*rsa.PublicKey, error) {
-	url := fmt.Sprintf("%s://%s:%s/v1/cred/public_key/test-%s", scheme, host, port, uuid.New())
+func getPublicKey(scheme, host, port, unique string) (*rsa.PublicKey, error) {
+	url := fmt.Sprintf("%s://%s:%s/v1/cred/public_key/test-%s", scheme, host, port, unique)
 	if os.Getenv("SKIP_SSL_VALIDATION") != "" && strings.ToLower(os.Getenv("SKIP_SSL_VALIDATION")) != "false" && strings.ToLower(os.Getenv("SKIP_SSL_VALIDATION")) != "no" {
 		client := http.DefaultClient
 		client.Transport = &http.Transport{
@@ -142,8 +143,7 @@ func getPublicKey(scheme, host, port string) (*rsa.PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	decoded := make([]byte, encoder.DecodedLen(len(data)))
-	_, err = encoder.Decode(decoded, data)
+	decoded, err := encoder.DecodeString(string(data))
 	if err != nil {
 		return nil, err
 	}
@@ -160,8 +160,8 @@ func getPublicKey(scheme, host, port string) (*rsa.PublicKey, error) {
 	return pk, nil
 }
 
-func getPrivKey(scheme, host, port string) (*rsa.PrivateKey, error) {
-	url := fmt.Sprintf("%s://%s:%s/v1/cred/private_key/test-%s", scheme, host, port, uuid.New())
+func getPrivKey(scheme, host, port, unique string) (*rsa.PrivateKey, error) {
+	url := fmt.Sprintf("%s://%s:%s/v1/cred/private_key/test-%s", scheme, host, port, unique)
 	if os.Getenv("SKIP_SSL_VALIDATION") != "" && strings.ToLower(os.Getenv("SKIP_SSL_VALIDATION")) != "false" && strings.ToLower(os.Getenv("SKIP_SSL_VALIDATION")) != "no" {
 		client := http.DefaultClient
 		client.Transport = &http.Transport{
@@ -180,18 +180,25 @@ func getPrivKey(scheme, host, port string) (*rsa.PrivateKey, error) {
 		return nil, err
 	}
 
-	decoded := make([]byte, encoder.DecodedLen(len(data)))
-	_, err = encoder.Decode(decoded, data)
+	decoded, err := encoder.DecodeString(string(data))
 	if err != nil {
 		return nil, err
 	}
 	return x509.ParsePKCS1PrivateKey(decoded)
 }
 
-func encrypt(pubKey *rsa.PublicKey, src string) (string, error) {
-	return "not encrypted", nil
+func encrypt(pubKey *rsa.PublicKey, src string, label []byte) (string, error) {
+	encrypted, err := rsa.EncryptOAEP(sha512.New(), rand.Reader, pubKey, []byte(src), label)
+	if err != nil {
+		return "", err
+	}
+	return string(encrypted), nil
 }
 
-func decrypt(privKey *rsa.PrivateKey, src string) (string, error) {
-	return "not decrypted", nil
+func decrypt(privKey *rsa.PrivateKey, src string, label []byte) (string, error) {
+	decrypted, err := rsa.DecryptOAEP(sha512.New(), rand.Reader, privKey, []byte(src), label)
+	if err != nil {
+		return "", err
+	}
+	return string(decrypted), nil
 }
