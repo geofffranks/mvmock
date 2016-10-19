@@ -132,7 +132,8 @@ func findKey(key string) (*rsa.PrivateKey, error) {
 }
 
 func getPublicKey(scheme, host, port, unique string) (*rsa.PublicKey, error) {
-	url := fmt.Sprintf("%s://%s:%s/v1/cred/public_key/test-%s", scheme, host, port, unique)
+	url := fmt.Sprintf("%s://%s:%s/v1/cred/public_key/%s", scheme, host, port, unique)
+	fmt.Printf("Requesting %s\n", url)
 	if os.Getenv("SKIP_SSL_VALIDATION") != "" && strings.ToLower(os.Getenv("SKIP_SSL_VALIDATION")) != "false" && strings.ToLower(os.Getenv("SKIP_SSL_VALIDATION")) != "no" {
 		client := http.DefaultClient
 		client.Transport = &http.Transport{
@@ -168,7 +169,8 @@ func getPublicKey(scheme, host, port, unique string) (*rsa.PublicKey, error) {
 }
 
 func getPrivKey(scheme, host, port, unique string) (*rsa.PrivateKey, error) {
-	url := fmt.Sprintf("%s://%s:%s/v1/cred/private_key/test-%s", scheme, host, port, unique)
+	url := fmt.Sprintf("%s://%s:%s/v1/cred/private_key/%s", scheme, host, port, unique)
+	fmt.Printf("Requesting %s\n", url)
 	if os.Getenv("SKIP_SSL_VALIDATION") != "" && strings.ToLower(os.Getenv("SKIP_SSL_VALIDATION")) != "false" && strings.ToLower(os.Getenv("SKIP_SSL_VALIDATION")) != "no" {
 		client := http.DefaultClient
 		client.Transport = &http.Transport{
