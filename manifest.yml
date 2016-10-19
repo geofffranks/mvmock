@@ -1,4 +1,5 @@
 name: mvmock
+command: mvmock
 buildpack: go_buildpack
 memory: 16mb
 env:
