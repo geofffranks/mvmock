@@ -3,6 +3,11 @@
 	"GoVersion": "go1.5",
 	"Deps": [
 		{
+			"ImportPath": "github.com/cloudfoundry-community/go-cfenv",
+			"Comment": "v1.14.0-7-gc567d77",
+			"Rev": "c567d77dab8551bc4077e68e5a04415f1d74a911"
+		},
+		{
 			"ImportPath": "github.com/gin-gonic/gin",
 			"Comment": "v1.0rc1-91-g4998bc2",
 			"Rev": "4998bc2b2e36cb2c498d75b1213dc92790fec98a"
@@ -30,8 +35,8 @@
 			"Rev": "56b76bdf51f7708750eac80fa38b952bb9f32639"
 		},
 		{
-			"ImportPath": "github.com/pborman/uuid",
-			"Rev": "cccd189d45f7ac3368a0d127efb7f4d08ae0b655"
+			"ImportPath": "github.com/mitchellh/mapstructure",
+			"Rev": "281073eb9eb092240d33ef253c404f1cca550309"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",

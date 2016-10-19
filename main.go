@@ -13,8 +13,8 @@ import (
 	"os"
 	"strings"
 
+	cfenv "github.com/cloudfoundry-community/go-cfenv"
 	"github.com/gin-gonic/gin"
-	"github.com/pborman/uuid"
 )
 
 var KEYS = map[string]*rsa.PrivateKey{}
@@ -74,7 +74,7 @@ func main() {
 
 		expected := "This is a test. This is only a test."
 		label := []byte("test-mvmock-encryption")
-		unique := uuid.New()
+		unique := getSpaceId()
 
 		pubKey, err := getPublicKey(scheme, host, port, unique)
 		if err != nil {
@@ -201,4 +201,9 @@ func decrypt(privKey *rsa.PrivateKey, src string, label []byte) (string, error) 
 		return "", err
 	}
 	return string(decrypted), nil
+}
+
+func getSpaceId() string {
+	appEnv, _ := cfenv.Current()
+	return appEnv.SpaceID
 }
