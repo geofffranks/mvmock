@@ -6,7 +6,7 @@ import (
 	"crypto/sha512"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -18,7 +18,6 @@ import (
 )
 
 var KEYS = map[string]*rsa.PrivateKey{}
-var encoder = base64.StdEncoding.WithPadding('=')
 
 func main() {
 	router := gin.Default()
@@ -45,7 +44,11 @@ func main() {
 			c.Done()
 			return
 		}
-		data := encoder.EncodeToString(publicKey)
+		block := &pem.Block{
+			Type:  "RSA PUBLIC KEY",
+			Bytes: publicKey,
+		}
+		data := pem.EncodeToMemory(block)
 		c.Data(200, "application/text", []byte(data))
 		c.Done()
 	})
@@ -63,7 +66,11 @@ func main() {
 			return
 		}
 		privateKey := x509.MarshalPKCS1PrivateKey(k)
-		data := encoder.EncodeToString(privateKey)
+		block := &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: privateKey,
+		}
+		data := pem.EncodeToMemory(block)
 		c.Data(200, "application/text", []byte(data))
 		c.Done()
 	})
@@ -143,12 +150,12 @@ func getPublicKey(scheme, host, port, unique string) (*rsa.PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	decoded, err := encoder.DecodeString(string(data))
-	if err != nil {
-		return nil, err
+	decoded, rest := pem.Decode(data)
+	if decoded == nil {
+		return nil, fmt.Errorf("Couldn't parse PEM data: %v", rest)
 	}
 
-	pubkey, err := x509.ParsePKIXPublicKey(decoded)
+	pubkey, err := x509.ParsePKIXPublicKey(decoded.Bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -180,11 +187,11 @@ func getPrivKey(scheme, host, port, unique string) (*rsa.PrivateKey, error) {
 		return nil, err
 	}
 
-	decoded, err := encoder.DecodeString(string(data))
-	if err != nil {
-		return nil, err
+	decoded, rest := pem.Decode(data)
+	if decoded == nil {
+		return nil, fmt.Errorf("Couldn't parse PEM data: %v", rest)
 	}
-	return x509.ParsePKCS1PrivateKey(decoded)
+	return x509.ParsePKCS1PrivateKey(decoded.Bytes)
 }
 
 func encrypt(pubKey *rsa.PublicKey, src string, label []byte) (string, error) {
