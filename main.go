@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha512"
@@ -11,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
 	cfenv "github.com/cloudfoundry-community/go-cfenv"
@@ -45,11 +47,27 @@ func main() {
 			return
 		}
 		block := &pem.Block{
-			Type:  "RSA PUBLIC KEY",
+			Type:  "PUBLIC KEY",
 			Bytes: publicKey,
 		}
 		data := pem.EncodeToMemory(block)
-		c.Data(200, "application/text", []byte(data))
+
+		cmd := exec.Command("openssl", "rsa", "-pubin", "-RSAPublicKey_out")
+		cmd.Stdin = bytes.NewBuffer(data)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			out = append(out, []byte("\n\n----\n\n"+err.Error()+"\n")...)
+			c.Data(500, "application/text", out)
+			c.Done()
+			return
+		}
+		if err != nil {
+			c.Data(500, "application/text", []byte(err.Error()+"\n"))
+			c.Done()
+			return
+		}
+
+		c.Data(200, "application/text", out)
 		c.Done()
 	})
 	router.GET("/v1/cred/private_key/:uid", func(c *gin.Context) {
@@ -70,8 +88,7 @@ func main() {
 			Type:  "RSA PRIVATE KEY",
 			Bytes: privateKey,
 		}
-		data := pem.EncodeToMemory(block)
-		c.Data(200, "application/text", []byte(data))
+		c.Data(200, "application/text", pem.EncodeToMemory(block))
 		c.Done()
 	})
 	router.GET("/test/:scheme/:host/:port", func(c *gin.Context) {
@@ -151,7 +168,15 @@ func getPublicKey(scheme, host, port, unique string) (*rsa.PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	decoded, rest := pem.Decode(data)
+
+	cmd := exec.Command("openssl", "rsa", "-RSAPublicKey_in", "-pubout")
+	cmd.Stdin = bytes.NewBuffer(data)
+	newPub, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("%s\n\n---\n%s\n", newPub, err)
+	}
+
+	decoded, rest := pem.Decode(newPub)
 	if decoded == nil {
 		return nil, fmt.Errorf("Couldn't parse PEM data: %v", rest)
 	}
