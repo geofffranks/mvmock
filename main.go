@@ -123,7 +123,7 @@ func executeTest(scheme, host, port string, c *gin.Context) {
 		return
 	}
 
-	privKey, err := getPrivKey(scheme, os.Getenv("CF_INSTANCE_IP"), "1199", unique)
+	privKey, err := getPrivKey("http", os.Getenv("CF_INSTANCE_IP"), "1199", unique)
 	if err != nil {
 		c.Data(500, "application/text", []byte("privkey error: "+err.Error()+"\n"))
 		c.Done()
