@@ -108,9 +108,8 @@ func main() {
 func executeTest(scheme, host, port string, c *gin.Context) {
 	expected := "This is a test. This is only a test."
 	label := []byte("test-mvmock-encryption")
-	unique := getSpaceId()
 
-	pubKey, err := getPublicKey(scheme, host, port, unique)
+	pubKey, err := getPublicKey(scheme, host, port, getSpaceId())
 	if err != nil {
 		c.Data(500, "application/text", []byte(err.Error()+"\n"))
 		c.Done()
@@ -123,7 +122,7 @@ func executeTest(scheme, host, port string, c *gin.Context) {
 		return
 	}
 
-	privKey, err := getPrivKey("http", os.Getenv("CF_INSTANCE_IP"), "1199", unique)
+	privKey, err := getPrivKey("http", os.Getenv("CF_INSTANCE_IP"), "1199", getAppId())
 	if err != nil {
 		c.Data(500, "application/text", []byte("privkey error: "+err.Error()+"\n"))
 		c.Done()
@@ -248,4 +247,9 @@ func decrypt(privKey *rsa.PrivateKey, src string, label []byte) (string, error) 
 func getSpaceId() string {
 	appEnv, _ := cfenv.Current()
 	return appEnv.SpaceID
+}
+
+func getAppId() string {
+	appEnv, _ := cfenv.Current()
+	return appEnv.ID
 }
