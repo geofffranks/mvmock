@@ -91,48 +91,56 @@ func main() {
 		c.Data(200, "application/text", pem.EncodeToMemory(block))
 		c.Done()
 	})
+	router.GET("/test_minivault", func(c *gin.Context) {
+		executeTest("https", os.Getenv("CF_INSTANCE_IP"), "1199", c)
+	})
+
 	router.GET("/test/:scheme/:host/:port", func(c *gin.Context) {
 		scheme := c.Param("scheme")
 		host := c.Param("host")
 		port := c.Param("port")
-
-		expected := "This is a test. This is only a test."
-		label := []byte("test-mvmock-encryption")
-		unique := getSpaceId()
-
-		pubKey, err := getPublicKey(scheme, host, port, unique)
-		if err != nil {
-			c.Data(500, "application/text", []byte(err.Error()+"\n"))
-			c.Done()
-			return
-		}
-		encrypted, err := encrypt(pubKey, expected, label)
-		if err != nil {
-			c.Data(500, "application/text", []byte(err.Error()+"\n"))
-			c.Done()
-			return
-		}
-
-		privKey, err := getPrivKey(scheme, host, port, unique)
-		if err != nil {
-			c.Data(500, "application/text", []byte("privkey error: "+err.Error()+"\n"))
-			c.Done()
-			return
-		}
-		decrypted, err := decrypt(privKey, encrypted, label)
-		if err != nil {
-			c.Data(500, "application/text", []byte("decryption error: "+err.Error()+"\n"))
-			c.Done()
-			return
-		}
-
-		if decrypted == expected {
-			c.Data(200, "application/text", []byte(fmt.Sprintf("Test successful. '%s' == '%s'\n", decrypted, expected)))
-		} else {
-			c.Data(501, "application/text", []byte(fmt.Sprintf("Test failed. '%s' != '%s'\n", decrypted, expected)))
-		}
+		executeTest(scheme, host, port, c)
 	})
+
 	router.Run(":" + os.Getenv("PORT"))
+}
+
+func executeTest(scheme, host, port string, c *gin.Context) {
+	expected := "This is a test. This is only a test."
+	label := []byte("test-mvmock-encryption")
+	unique := getSpaceId()
+
+	pubKey, err := getPublicKey(scheme, host, port, unique)
+	if err != nil {
+		c.Data(500, "application/text", []byte(err.Error()+"\n"))
+		c.Done()
+		return
+	}
+	encrypted, err := encrypt(pubKey, expected, label)
+	if err != nil {
+		c.Data(500, "application/text", []byte(err.Error()+"\n"))
+		c.Done()
+		return
+	}
+
+	privKey, err := getPrivKey(scheme, os.Getenv("CF_INSTANCE_IP"), "1199", unique)
+	if err != nil {
+		c.Data(500, "application/text", []byte("privkey error: "+err.Error()+"\n"))
+		c.Done()
+		return
+	}
+	decrypted, err := decrypt(privKey, encrypted, label)
+	if err != nil {
+		c.Data(500, "application/text", []byte("decryption error: "+err.Error()+"\n"))
+		c.Done()
+		return
+	}
+
+	if decrypted == expected {
+		c.Data(200, "application/text", []byte(fmt.Sprintf("Test successful. '%s' == '%s'\n", decrypted, expected)))
+	} else {
+		c.Data(501, "application/text", []byte(fmt.Sprintf("Test failed. '%s' != '%s'\n", decrypted, expected)))
+	}
 }
 
 func findKey(key string) (*rsa.PrivateKey, error) {
