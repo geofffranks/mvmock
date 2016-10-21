@@ -17,6 +17,7 @@ import (
 
 	cfenv "github.com/cloudfoundry-community/go-cfenv"
 	"github.com/gin-gonic/gin"
+	"github.com/pborman/uuid"
 )
 
 var KEYS = map[string]*rsa.PrivateKey{}
@@ -52,7 +53,7 @@ func main() {
 		}
 		data := pem.EncodeToMemory(block)
 
-		cmd := exec.Command("openssl", "rsa", "-pubin", "-RSAPublicKey_out")
+		cmd := exec.Command(findOpenSSL(), "rsa", "-pubin", "-RSAPublicKey_out")
 		cmd.Stdin = bytes.NewBuffer(data)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -91,10 +92,6 @@ func main() {
 		c.Data(200, "application/text", pem.EncodeToMemory(block))
 		c.Done()
 	})
-	router.GET("/test_minivault", func(c *gin.Context) {
-		executeTest("https", os.Getenv("CF_INSTANCE_IP"), "1199", c)
-	})
-
 	router.GET("/test/:scheme/:host/:port", func(c *gin.Context) {
 		scheme := c.Param("scheme")
 		host := c.Param("host")
@@ -108,9 +105,9 @@ func main() {
 func executeTest(scheme, host, port string, c *gin.Context) {
 	expected := "This is a test. This is only a test."
 	label := []byte("test-mvmock-encryption")
-	unique := getSpaceId()
+	spaceId := getSpaceId()
 
-	pubKey, err := getPublicKey(scheme, host, port, unique)
+	pubKey, err := getPublicKey(scheme, host, port, spaceId)
 	if err != nil {
 		c.Data(500, "application/text", []byte(err.Error()+"\n"))
 		c.Done()
@@ -123,7 +120,12 @@ func executeTest(scheme, host, port string, c *gin.Context) {
 		return
 	}
 
-	privKey, err := getPrivKey("http", os.Getenv("CF_INSTANCE_IP"), "1199", unique)
+	if os.Getenv("CF_INSTANCE_IP") != "" {
+		host = os.Getenv("CF_INSTANCE_IP")
+		port = "1199"
+		scheme = "http"
+	}
+	privKey, err := getPrivKey(scheme, host, port, spaceId)
 	if err != nil {
 		c.Data(500, "application/text", []byte("privkey error: "+err.Error()+"\n"))
 		c.Done()
@@ -177,7 +179,7 @@ func getPublicKey(scheme, host, port, unique string) (*rsa.PublicKey, error) {
 		return nil, err
 	}
 
-	cmd := exec.Command("openssl", "rsa", "-RSAPublicKey_in", "-pubout")
+	cmd := exec.Command(findOpenSSL(), "rsa", "-RSAPublicKey_in", "-pubout")
 	cmd.Stdin = bytes.NewBuffer(data)
 	newPub, err := cmd.CombinedOutput()
 	if err != nil {
@@ -247,5 +249,17 @@ func decrypt(privKey *rsa.PrivateKey, src string, label []byte) (string, error) 
 
 func getSpaceId() string {
 	appEnv, _ := cfenv.Current()
+	if appEnv == nil || appEnv.SpaceID == "" {
+		return uuid.New()
+	}
 	return appEnv.SpaceID
+}
+
+func findOpenSSL() string {
+	openssl := "/usr/local/opt/openssl/bin/openssl"
+	if _, err := os.Stat(openssl); os.IsNotExist(err) {
+		openssl = "openssl"
+	}
+	fmt.Printf("Using '%s' for openssl binary\n", openssl)
+	return openssl
 }
