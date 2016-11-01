@@ -55,7 +55,7 @@ func main() {
 
 		cmd := exec.Command(findOpenSSL(), "rsa", "-pubin", "-RSAPublicKey_out")
 		cmd.Stdin = bytes.NewBuffer(data)
-		out, err := cmd.CombinedOutput()
+		out, err := cmd.Output()
 		if err != nil {
 			out = append(out, []byte("\n\n----\n\n"+err.Error()+"\n")...)
 			c.Data(500, "application/text", out)
