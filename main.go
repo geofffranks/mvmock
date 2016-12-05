@@ -7,6 +7,7 @@ import (
 	"crypto/sha512"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -59,11 +60,6 @@ func main() {
 		if err != nil {
 			out = append(out, []byte("\n\n----\n\n"+err.Error()+"\n")...)
 			c.Data(500, "application/text", out)
-			c.Done()
-			return
-		}
-		if err != nil {
-			c.Data(500, "application/text", []byte(err.Error()+"\n"))
 			c.Done()
 			return
 		}
@@ -179,16 +175,27 @@ func getPublicKey(scheme, host, port, unique string) (*rsa.PublicKey, error) {
 		return nil, err
 	}
 
-	cmd := exec.Command(findOpenSSL(), "rsa", "-RSAPublicKey_in", "-pubout")
-	cmd.Stdin = bytes.NewBuffer(data)
-	newPub, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("%s\n\n---\n%s\n", newPub, err)
-	}
+	//	cmd := exec.Command(findOpenSSL(), "rsa", "-RSAPublicKey_in", "-pubout")
+	//	cmd.Stdin = bytes.NewBuffer(data)
+	//	newPub, err := cmd.CombinedOutput()
+	//	if err != nil {
+	//		return nil, fmt.Errorf("%s\n\n---\n%s\n", newPub, err)
+	//	}
 
-	decoded, rest := pem.Decode(newPub)
+	decoded, rest := pem.Decode(data)
 	if decoded == nil {
 		return nil, fmt.Errorf("Couldn't parse PEM data: %v", rest)
+	}
+
+	if decoded.Type == "RSA PUBLIC KEY" {
+		decoded.Type = "PUBLIC KEY"
+		prefix, err := base64.StdEncoding.DecodeString("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A")
+		if err != nil {
+			return nil, err
+		}
+		decoded.Bytes = append(prefix, decoded.Bytes...)
+	} else {
+		fmt.Fprintf(os.Stderr, "Detected '%s' key type. Not converting from PKCS to PKIX\n", decoded.Type)
 	}
 
 	pubkey, err := x509.ParsePKIXPublicKey(decoded.Bytes)
