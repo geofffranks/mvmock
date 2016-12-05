@@ -1,4 +1,6 @@
-name: mvmock
+name: minivault
+host: minivault-01
+domain: FIXME
 command: mvmock
 buildpack: go_buildpack
 memory: 16mb
